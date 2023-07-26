@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  * ========================================================================== */
 
-import React, { useEffect } from "react";
+import React from "react";
 
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import sdk from "@paloaltonetworks/postman-collection";
@@ -16,7 +16,6 @@ import { Provider } from "react-redux";
 import { ThemeConfig } from "../../types";
 import { createAuth } from "./Authorization/slice";
 import Curl from "./Curl";
-import { useSlashIDAttributes } from "./hooks";
 import MethodEndpoint from "./MethodEndpoint";
 import { createPersistanceMiddleware } from "./persistanceMiddleware";
 import Request from "./Request";
@@ -25,29 +24,6 @@ import SecuritySchemes from "./SecuritySchemes";
 import Server from "./Server";
 import { createStoreWithState } from "./store";
 import styles from "./styles.module.css";
-
-interface SlashIDWrapperProps {
-  children: React.ReactNode;
-}
-
-/**
- * Reads the customFields from the docusarus config to get the list of attributes
- * used as the initial values for the specified param names.
- */
-const SlashIDAttributesWrapper: React.FC<SlashIDWrapperProps> = ({
-  children,
-}) => {
-  const { siteConfig } = useDocusaurusContext();
-  const paramNames = React.useMemo(() => {
-    return {
-      persistentParamNames:
-        (siteConfig?.customFields?.persistentParamNames as string[]) ?? [],
-    };
-  }, [siteConfig?.customFields?.persistentParamNames]);
-  useSlashIDAttributes(paramNames);
-
-  return <>{children}</>;
-};
 
 function ApiDemoPanel({
   item,
@@ -116,17 +92,15 @@ function ApiDemoPanel({
   return (
     <Provider store={store2}>
       <div className={styles.apiDemoPanelContainer}>
-        <SlashIDAttributesWrapper>
-          <MethodEndpoint method={method} path={path} />
-          <Server />
-          <SecuritySchemes infoPath={infoPath} />
-          <Request item={item} />
-          <Response />
-          <Curl
-            postman={postman}
-            codeSamples={(item as any)["x-code-samples"] ?? []}
-          />
-        </SlashIDAttributesWrapper>
+        <MethodEndpoint method={method} path={path} />
+        <Server />
+        <SecuritySchemes infoPath={infoPath} />
+        <Request item={item} />
+        <Response />
+        <Curl
+          postman={postman}
+          codeSamples={(item as any)["x-code-samples"] ?? []}
+        />
       </div>
     </Provider>
   );
