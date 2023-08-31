@@ -7,7 +7,7 @@
 
 import React from "react";
 
-import { ApiItem } from "docusaurus-plugin-openapi-docs-slashid/src/types";
+import { ApiItem } from "@slashid/docusaurus-plugin-openapi-docs-slashid/src/types";
 
 import FormItem from "../FormItem";
 import FormSelect from "../FormSelect";

@@ -7,7 +7,7 @@
 
 import React from "react";
 
-import { RequestBodyObject } from "docusaurus-plugin-openapi-docs-slashid/src/openapi/types";
+import { RequestBodyObject } from "@slashid/docusaurus-plugin-openapi-docs-slashid/src/openapi/types";
 import format from "xml-formatter";
 
 import ContentType from "../ContentType";

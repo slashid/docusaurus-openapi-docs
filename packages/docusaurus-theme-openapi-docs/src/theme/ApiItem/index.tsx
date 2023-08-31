@@ -9,9 +9,9 @@ import React from "react";
 
 import ExecutionEnvironment from "@docusaurus/ExecutionEnvironment";
 import { HtmlClassNameProvider } from "@docusaurus/theme-common";
+import type { ApiItem as ApiItemType } from "@slashid/docusaurus-plugin-openapi-docs-slashid/lib/types";
 import type { Props } from "@theme/DocItem";
 import clsx from "clsx";
-import type { ApiItem as ApiItemType } from "docusaurus-plugin-openapi-docs/lib/types";
 
 import { DocFrontMatter } from "../../types";
 import DocItemLayout from "./Layout";

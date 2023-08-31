@@ -9,7 +9,7 @@ import sdk from "@paloaltonetworks/postman-collection";
 import {
   ParameterObject,
   ServerObject,
-} from "docusaurus-plugin-openapi-docs/src/openapi/types";
+} from "@slashid/docusaurus-plugin-openapi-docs/src/openapi/types";
 import cloneDeep from "lodash/cloneDeep";
 
 import { AuthState, Scheme } from "./Authorization/slice";
