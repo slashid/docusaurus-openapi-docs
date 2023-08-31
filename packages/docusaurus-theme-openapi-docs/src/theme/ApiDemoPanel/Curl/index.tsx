@@ -10,10 +10,8 @@ import React, { useState, useEffect } from "react";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import codegen from "@paloaltonetworks/postman-code-generators";
 import sdk from "@paloaltonetworks/postman-collection";
-import CodeBlock from "@theme/CodeBlock";
 import clsx from "clsx";
 
-import CodeTabs from "../CodeTabs";
 import { useTypedSelector } from "../hooks";
 import buildPostmanRequest from "./../buildPostmanRequest";
 import styles from "./styles.module.css";
@@ -239,28 +237,7 @@ function Curl({ postman, codeSamples }: Props) {
     return null;
   }
 
-  return (
-    <>
-      <CodeTabs groupId="code-samples" action={setLanguage}>
-        {langs.map((lang) => {
-          return (
-            <CodeTab
-              value={lang.language}
-              label={""}
-              key={
-                lang.variant
-                  ? `${lang.language}-${lang.variant}`
-                  : lang.language
-              }
-              attributes={{ className: `code__tab--${lang.logoClass}` }}
-            >
-              <CodeBlock language={lang.highlight}>{codeText}</CodeBlock>
-            </CodeTab>
-          );
-        })}
-      </CodeTabs>
-    </>
-  );
+  return <></>;
 }
 
 export default Curl;
