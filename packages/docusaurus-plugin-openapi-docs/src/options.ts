@@ -8,24 +8,38 @@
 import { Joi } from "@docusaurus/utils-validation";
 
 const sidebarOptions = Joi.object({
-  groupPathsBy: Joi.string().valid("tag"),
-  categoryLinkSource: Joi.string().valid("tag", "info"),
+  groupPathsBy: Joi.string().valid("tag", "tagGroup"),
+  categoryLinkSource: Joi.string().valid("tag", "info", "auto"),
   customProps: Joi.object(),
   sidebarCollapsible: Joi.boolean(),
   sidebarCollapsed: Joi.boolean(),
 });
 
+const markdownGenerators = Joi.object({
+  createApiPageMD: Joi.function(),
+  createInfoPageMD: Joi.function(),
+  createTagPageMD: Joi.function(),
+});
+
 export const OptionsSchema = Joi.object({
   id: Joi.string().required(),
+  docsPlugin: Joi.string(),
   docsPluginId: Joi.string().required(),
   config: Joi.object()
     .pattern(
       /^/,
       Joi.object({
         specPath: Joi.string().required(),
+        proxy: Joi.string(),
         outputDir: Joi.string().required(),
         template: Joi.string(),
+        downloadUrl: Joi.string(),
+        hideSendButton: Joi.boolean(),
+        showExtensions: Joi.boolean(),
         sidebarOptions: sidebarOptions,
+        markdownGenerators: markdownGenerators,
+        showSchemas: Joi.boolean(),
+        disableCompression: Joi.boolean(),
         version: Joi.string().when("versions", {
           is: Joi.exist(),
           then: Joi.required(),

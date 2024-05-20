@@ -13,8 +13,8 @@ import chalk from "chalk";
 // @ts-ignore
 import { convertObj } from "swagger2openapi";
 
-import { OpenApiObject } from "../types";
 import { OpenAPIParser } from "./services/OpenAPIParser";
+import { OpenApiObject } from "../types";
 
 function serializer(replacer: any, cycleReplacer: any) {
   var stack: any = [],
@@ -66,7 +66,13 @@ export function convertSwagger2OpenAPI(spec: object) {
   return new Promise((resolve, reject) =>
     convertObj(
       spec,
-      { patch: true, warnOnly: true, text: "{}", anchors: true },
+      {
+        patch: true,
+        warnOnly: true,
+        text: "{}",
+        anchors: true,
+        resolveInternal: true,
+      },
       (err: any, res: any) => {
         // TODO: log any warnings
         if (err) {
@@ -95,7 +101,16 @@ async function resolveJsonRefs(specUrlOrObject: object | string) {
     });
     return schema as OpenApiObject;
   } catch (err: any) {
-    console.error(chalk.yellow(err.errors[0]?.message ?? err));
+    let errorMsg = "";
+
+    if (err.errors[0] !== undefined) {
+      const error = err.errors[0];
+      errorMsg = `Error: [${error.message}] with footprint [${error.footprint}]`;
+    } else {
+      errorMsg = err;
+    }
+
+    console.error(chalk.yellow(errorMsg));
     return;
   }
 }
@@ -122,6 +137,21 @@ export async function loadAndResolveSpec(specUrlOrObject: object | string) {
   const {
     bundle: { parsed },
   } = await bundle(bundleOpts);
+
+  //Pre-processing before resolving JSON refs
+  if (parsed.components) {
+    for (let [component, type] of Object.entries(parsed.components) as any) {
+      if (component === "schemas") {
+        for (let [schemaKey, schemaValue] of Object.entries(type) as any) {
+          const title: string | undefined = schemaValue["title"];
+          if (!title) {
+            schemaValue.title = schemaKey;
+          }
+        }
+      }
+    }
+  }
+
   const resolved = await resolveJsonRefs(parsed);
 
   // Force serialization and replace circular $ref pointers

@@ -6,9 +6,10 @@
  * ========================================================================== */
 
 import chalk from "chalk";
+import merge from "lodash/merge";
 
-import { mergeAllOf } from "../markdown/createRequestSchema";
 import { SchemaObject } from "./types";
+import { mergeAllOf } from "../markdown/createSchema";
 
 interface OASTypeToTypeMap {
   string: string;
@@ -77,18 +78,30 @@ function sampleRequestFromProp(name: string, prop: any, obj: any): any {
 
 export const sampleRequestFromSchema = (schema: SchemaObject = {}): any => {
   try {
-    let { type, example, allOf, properties, items, oneOf, anyOf } = schema;
+    // deep copy schema before processing
+    let schemaCopy = JSON.parse(JSON.stringify(schema));
+    let { type, example, allOf, properties, items, oneOf, anyOf } = schemaCopy;
 
     if (example !== undefined) {
       return example;
     }
 
     if (oneOf) {
+      if (properties) {
+        const combinedSchemas = merge(schemaCopy, oneOf[0]);
+        delete combinedSchemas.oneOf;
+        return sampleRequestFromSchema(combinedSchemas);
+      }
       // Just go with first schema
       return sampleRequestFromSchema(oneOf[0]);
     }
 
     if (anyOf) {
+      if (properties) {
+        const combinedSchemas = merge(schemaCopy, anyOf[0]);
+        delete combinedSchemas.anyOf;
+        return sampleRequestFromSchema(combinedSchemas);
+      }
       // Just go with first schema
       return sampleRequestFromSchema(anyOf[0]);
     }
@@ -98,10 +111,15 @@ export const sampleRequestFromSchema = (schema: SchemaObject = {}): any => {
         mergeAllOf(allOf);
       if (mergedSchemas.properties) {
         for (const [key, value] of Object.entries(mergedSchemas.properties)) {
-          if (value.readOnly && value.readOnly === true) {
+          if ((value.readOnly && value.readOnly === true) || value.deprecated) {
             delete mergedSchemas.properties[key];
           }
         }
+      }
+      if (properties) {
+        const combinedSchemas = merge(schemaCopy, mergedSchemas);
+        delete combinedSchemas.allOf;
+        return sampleRequestFromSchema(combinedSchemas);
       }
       return sampleRequestFromSchema(mergedSchemas);
     }
@@ -118,21 +136,33 @@ export const sampleRequestFromSchema = (schema: SchemaObject = {}): any => {
 
     if (type === "object") {
       let obj: any = {};
-      for (let [name, prop] of Object.entries(properties ?? {})) {
+      for (let [name, prop] of Object.entries(properties ?? {}) as any) {
         if (prop.properties) {
-          for (const [key, value] of Object.entries(prop.properties)) {
-            if (value.readOnly && value.readOnly === true) {
+          for (const [key, value] of Object.entries(prop.properties) as any) {
+            if (
+              (value.readOnly && value.readOnly === true) ||
+              value.deprecated
+            ) {
               delete prop.properties[key];
             }
           }
         }
 
         if (prop.items && prop.items.properties) {
-          for (const [key, value] of Object.entries(prop.items.properties)) {
-            if (value.readOnly && value.readOnly === true) {
+          for (const [key, value] of Object.entries(
+            prop.items.properties
+          ) as any) {
+            if (
+              (value.readOnly && value.readOnly === true) ||
+              value.deprecated
+            ) {
               delete prop.items.properties[key];
             }
           }
+        }
+
+        if (prop.readOnly && prop.readOnly === true) {
+          continue;
         }
 
         if (prop.deprecated) {
@@ -147,28 +177,31 @@ export const sampleRequestFromSchema = (schema: SchemaObject = {}): any => {
 
     if (type === "array") {
       if (Array.isArray(items?.anyOf)) {
-        return items?.anyOf.map((item) => sampleRequestFromSchema(item));
+        return items?.anyOf.map((item: any) => sampleRequestFromSchema(item));
       }
 
       if (Array.isArray(items?.oneOf)) {
-        return items?.oneOf.map((item) => sampleRequestFromSchema(item));
+        return items?.oneOf.map((item: any) => sampleRequestFromSchema(item));
       }
 
       return [sampleRequestFromSchema(items)];
     }
 
-    if (schema.enum) {
-      if (schema.default) {
-        return schema.default;
+    if (schemaCopy.enum) {
+      if (schemaCopy.default) {
+        return schemaCopy.default;
       }
-      return normalizeArray(schema.enum)[0];
+      return normalizeArray(schemaCopy.enum)[0];
     }
 
-    if (schema.readOnly && schema.readOnly === true) {
+    if (
+      (schema.readOnly && schema.readOnly === true) ||
+      schemaCopy.deprecated
+    ) {
       return undefined;
     }
 
-    return primitive(schema);
+    return primitive(schemaCopy);
   } catch (err) {
     console.error(
       chalk.yellow("WARNING: failed to create example from schema object:", err)

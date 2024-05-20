@@ -21,6 +21,8 @@ export interface OpenApiObject {
   tags?: TagObject[];
   externalDocs?: ExternalDocumentationObject;
   swagger?: string;
+  "x-webhooks"?: PathsObject;
+  "x-tagGroups"?: TagGroupObject[];
 }
 
 export interface OpenApiObjectWithRef {
@@ -310,6 +312,11 @@ export interface TagObject {
   description?: string;
   externalDocs?: ExternalDocumentationObject;
   "x-displayName"?: string;
+}
+
+export interface TagGroupObject {
+  name: string;
+  tags: string[];
 }
 
 export interface ReferenceObject {

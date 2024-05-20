@@ -6,9 +6,10 @@
  * ========================================================================== */
 
 import chalk from "chalk";
+import merge from "lodash/merge";
 
-import { mergeAllOf } from "../markdown/createResponseSchema";
 import { SchemaObject } from "./types";
+import { mergeAllOf } from "../markdown/createSchema";
 
 interface OASTypeToTypeMap {
   string: string;
@@ -77,33 +78,51 @@ function sampleResponseFromProp(name: string, prop: any, obj: any): any {
 
 export const sampleResponseFromSchema = (schema: SchemaObject = {}): any => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let { type, example, allOf, oneOf, anyOf, properties, items } = schema;
+    // deep copy schema before processing
+    let schemaCopy = JSON.parse(JSON.stringify(schema));
+    let { type, example, allOf, properties, items, oneOf, anyOf } = schemaCopy;
 
-    // TODO: determine if we should always ignore the example when creating from schema
-    // if (example !== undefined) {
-    //   return example;
-    // }
+    if (example !== undefined) {
+      return example;
+    }
 
     if (allOf) {
       const { mergedSchemas }: { mergedSchemas: SchemaObject } =
         mergeAllOf(allOf);
       if (mergedSchemas.properties) {
         for (const [key, value] of Object.entries(mergedSchemas.properties)) {
-          if (value.writeOnly && value.writeOnly === true) {
+          if (
+            (value.writeOnly && value.writeOnly === true) ||
+            value.deprecated
+          ) {
             delete mergedSchemas.properties[key];
           }
         }
+      }
+      if (properties) {
+        const combinedSchemas = merge(schemaCopy, mergedSchemas);
+        delete combinedSchemas.allOf;
+        return sampleResponseFromSchema(combinedSchemas);
       }
       return sampleResponseFromSchema(mergedSchemas);
     }
 
     if (oneOf) {
+      if (properties) {
+        const combinedSchemas = merge(schemaCopy, oneOf[0]);
+        delete combinedSchemas.oneOf;
+        return sampleResponseFromSchema(combinedSchemas);
+      }
       // Just go with first schema
       return sampleResponseFromSchema(oneOf[0]);
     }
 
     if (anyOf) {
+      if (properties) {
+        const combinedSchemas = merge(schemaCopy, anyOf[0]);
+        delete combinedSchemas.anyOf;
+        return sampleResponseFromSchema(combinedSchemas);
+      }
       // Just go with first schema
       return sampleResponseFromSchema(anyOf[0]);
     }
@@ -120,21 +139,33 @@ export const sampleResponseFromSchema = (schema: SchemaObject = {}): any => {
 
     if (type === "object") {
       let obj: any = {};
-      for (let [name, prop] of Object.entries(properties ?? {})) {
+      for (let [name, prop] of Object.entries(properties ?? {}) as any) {
         if (prop.properties) {
-          for (const [key, value] of Object.entries(prop.properties)) {
-            if (value.writeOnly && value.writeOnly === true) {
+          for (const [key, value] of Object.entries(prop.properties) as any) {
+            if (
+              (value.writeOnly && value.writeOnly === true) ||
+              value.deprecated
+            ) {
               delete prop.properties[key];
             }
           }
         }
 
         if (prop.items && prop.items.properties) {
-          for (const [key, value] of Object.entries(prop.items.properties)) {
-            if (value.writeOnly && value.writeOnly === true) {
+          for (const [key, value] of Object.entries(
+            prop.items.properties
+          ) as any) {
+            if (
+              (value.writeOnly && value.writeOnly === true) ||
+              value.deprecated
+            ) {
               delete prop.items.properties[key];
             }
           }
+        }
+
+        if (prop.writeOnly && prop.writeOnly === true) {
+          continue;
         }
 
         if (prop.deprecated) {
@@ -149,28 +180,31 @@ export const sampleResponseFromSchema = (schema: SchemaObject = {}): any => {
 
     if (type === "array") {
       if (Array.isArray(items?.anyOf)) {
-        return items?.anyOf.map((item) => sampleResponseFromSchema(item));
+        return items?.anyOf.map((item: any) => sampleResponseFromSchema(item));
       }
 
       if (Array.isArray(items?.oneOf)) {
-        return items?.oneOf.map((item) => sampleResponseFromSchema(item));
+        return items?.oneOf.map((item: any) => sampleResponseFromSchema(item));
       }
 
       return [sampleResponseFromSchema(items)];
     }
 
-    if (schema.enum) {
-      if (schema.default) {
-        return schema.default;
+    if (schemaCopy.enum) {
+      if (schemaCopy.default) {
+        return schemaCopy.default;
       }
-      return normalizeArray(schema.enum)[0];
+      return normalizeArray(schemaCopy.enum)[0];
     }
 
-    if (schema.writeOnly && schema.writeOnly === true) {
+    if (
+      (schemaCopy.writeOnly && schemaCopy.writeOnly === true) ||
+      schemaCopy.deprecated
+    ) {
       return undefined;
     }
 
-    return primitive(schema);
+    return primitive(schemaCopy);
   } catch (err) {
     console.error(
       chalk.yellow("WARNING: failed to create example from schema object:", err)

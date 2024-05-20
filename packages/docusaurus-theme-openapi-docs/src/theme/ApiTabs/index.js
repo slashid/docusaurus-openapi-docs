@@ -5,141 +5,59 @@
  * LICENSE file in the root directory of this source tree.
  * ========================================================================== */
 
-import React, {
-  Children,
-  cloneElement,
-  isValidElement,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { cloneElement, useRef, useState, useEffect } from "react";
 
-import { duplicates } from "@docusaurus/theme-common";
+import {
+  useScrollPositionBlocker,
+  useTabs,
+} from "@docusaurus/theme-common/internal";
 import useIsBrowser from "@docusaurus/useIsBrowser";
+import Heading from "@theme/Heading";
 import clsx from "clsx";
 
-import styles from "./styles.module.css"; // A very rough duck type, but good enough to guard against mistakes while
-
-const {
-  useScrollPositionBlocker,
-  useTabGroupChoice,
-} = require("@docusaurus/theme-common/internal");
-
-// allowing customization
-
-function isTabItem(comp) {
-  return typeof comp.props.value !== "undefined";
-}
-
-function ApiTabsComponent(props) {
-  const {
-    lazy,
-    block,
-    defaultValue: defaultValueProp,
-    values: valuesProp,
-    groupId,
-    className,
-  } = props;
-  const children = Children.map(props.children, (child) => {
-    if (isValidElement(child) && isTabItem(child)) {
-      return child;
-    } // child.type.name will give non-sensical values in prod because of
-    // minification, but we assume it won't throw in prod.
-
-    throw new Error(
-      `Docusaurus error: Bad <Tabs> child <${
-        // @ts-expect-error: guarding against unexpected cases
-        typeof child.type === "string" ? child.type : child.type.name
-      }>: all children of the <Tabs> component should be <TabItem>, and every <TabItem> should have a unique "value" prop.`
-    );
-  });
-  const values =
-    valuesProp ?? // We only pick keys that we recognize. MDX would inject some keys by default
-    children.map(({ props: { value, label, attributes } }) => ({
-      value,
-      label,
-      attributes,
-    }));
-  const dup = duplicates(values, (a, b) => a.value === b.value);
-
-  if (dup.length > 0) {
-    throw new Error(
-      `Docusaurus error: Duplicate values "${dup
-        .map((a) => a.value)
-        .join(", ")}" found in <Tabs>. Every value needs to be unique.`
-    );
-  } // When defaultValueProp is null, don't show a default tab
-
-  const defaultValue =
-    defaultValueProp === null
-      ? defaultValueProp
-      : defaultValueProp ??
-        children.find((child) => child.props.default)?.props.value ??
-        children[0]?.props.value;
-
-  if (defaultValue !== null && !values.some((a) => a.value === defaultValue)) {
-    throw new Error(
-      `Docusaurus error: The <Tabs> has a defaultValue "${defaultValue}" but none of its children has the corresponding value. Available values are: ${values
-        .map((a) => a.value)
-        .join(
-          ", "
-        )}. If you intend to show no default tab, use defaultValue={null} instead.`
-    );
-  }
-
-  const { tabGroupChoices, setTabGroupChoices } = useTabGroupChoice();
-  const [selectedValue, setSelectedValue] = useState(defaultValue);
+function TabList({
+  className,
+  block,
+  selectedValue,
+  selectValue,
+  tabValues,
+  label = "Responses",
+  id = "responses",
+}) {
   const tabRefs = [];
   const { blockElementScrollPositionUntilNextRender } =
     useScrollPositionBlocker();
 
-  if (groupId != null) {
-    const relevantTabGroupChoice = tabGroupChoices[groupId];
-
-    if (
-      relevantTabGroupChoice != null &&
-      relevantTabGroupChoice !== selectedValue &&
-      values.some((value) => value.value === relevantTabGroupChoice)
-    ) {
-      setSelectedValue(relevantTabGroupChoice);
-    }
-  }
-
   const handleTabChange = (event) => {
     const newTab = event.currentTarget;
     const newTabIndex = tabRefs.indexOf(newTab);
-    const newTabValue = values[newTabIndex].value;
-
+    const newTabValue = tabValues[newTabIndex].value;
     if (newTabValue !== selectedValue) {
       blockElementScrollPositionUntilNextRender(newTab);
-      setSelectedValue(newTabValue);
-
-      if (groupId != null) {
-        setTabGroupChoices(groupId, newTabValue);
-      }
+      selectValue(newTabValue);
     }
   };
 
   const handleKeydown = (event) => {
     let focusElement = null;
-
     switch (event.key) {
+      case "Enter": {
+        handleTabChange(event);
+        break;
+      }
       case "ArrowRight": {
         const nextTab = tabRefs.indexOf(event.currentTarget) + 1;
-        focusElement = tabRefs[nextTab] || tabRefs[0];
+        focusElement = tabRefs[nextTab] ?? tabRefs[0];
         break;
       }
-
       case "ArrowLeft": {
         const prevTab = tabRefs.indexOf(event.currentTarget) - 1;
-        focusElement = tabRefs[prevTab] || tabRefs[tabRefs.length - 1];
+        focusElement = tabRefs[prevTab] ?? tabRefs[tabRefs.length - 1];
         break;
       }
-
       default:
         break;
     }
-
     focusElement?.focus();
   };
 
@@ -147,12 +65,23 @@ function ApiTabsComponent(props) {
   const [showTabArrows, setShowTabArrows] = useState(false);
 
   useEffect(() => {
-    const tabOffsetWidth = tabItemListContainerRef.current.offsetWidth;
-    const tabScrollWidth = tabItemListContainerRef.current.scrollWidth;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        requestAnimationFrame(() => {
+          if (entry.target.offsetWidth < entry.target.scrollWidth) {
+            setShowTabArrows(true);
+          } else {
+            setShowTabArrows(false);
+          }
+        });
+      }
+    });
 
-    if (tabOffsetWidth < tabScrollWidth) {
-      setShowTabArrows(true);
-    }
+    resizeObserver.observe(tabItemListContainerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, []);
 
   const handleRightClick = () => {
@@ -164,103 +93,107 @@ function ApiTabsComponent(props) {
   };
 
   return (
-    <div className="tabs__container">
-      <div className={styles.responseTabsTopSection}>
-        <strong>Responses</strong>
-        <div className={styles.responseTabsContainer}>
-          {showTabArrows && (
-            <button
-              className={clsx(styles.tabArrow, styles.tabArrowLeft)}
-              onClick={handleLeftClick}
-            />
+    <div className="openapi-tabs__response-header-section">
+      <Heading as="h2" id={id} className="openapi-tabs__response-header">
+        {label}
+      </Heading>
+      <div className="openapi-tabs__response-container">
+        {showTabArrows && (
+          <button
+            className="openapi-tabs__arrow left"
+            onClick={handleLeftClick}
+          />
+        )}
+        <ul
+          ref={tabItemListContainerRef}
+          role="tablist"
+          aria-orientation="horizontal"
+          className={clsx(
+            "openapi-tabs__response-list-container",
+            "tabs",
+            {
+              "tabs--block": block,
+            },
+            className
           )}
-          <ul
-            ref={tabItemListContainerRef}
-            role="tablist"
-            aria-orientation="horizontal"
-            className={clsx(
-              styles.responseTabsListContainer,
-              "tabs",
-              {
-                "tabs--block": block,
-              },
-              className
-            )}
-          >
-            {values.map(({ value, label, attributes }) => {
-              const responseTabDotStyle =
-                parseInt(value) >= 400
-                  ? styles.responseTabDotDanger
-                  : parseInt(value) >= 200 && parseInt(value) < 300
-                  ? styles.responseTabDotSuccess
-                  : styles.responseTabDotInfo;
-
-              return (
-                <li
-                  role="tab"
-                  tabIndex={selectedValue === value ? 0 : -1}
-                  aria-selected={selectedValue === value}
-                  key={value}
-                  ref={(tabControl) => tabRefs.push(tabControl)}
-                  onKeyDown={handleKeydown}
-                  onFocus={handleTabChange}
-                  onClick={handleTabChange}
-                  {...attributes}
-                  className={clsx(
-                    "tabs__item",
-                    styles.tabItem,
-                    attributes?.className,
-                    {
-                      [styles.responseTabActive]: selectedValue === value,
-                    }
-                  )}
-                >
-                  <div
-                    className={clsx(styles.responseTabDot, responseTabDotStyle)}
-                  />
-                  {label ?? value}
-                </li>
-              );
-            })}
-          </ul>
-          {showTabArrows && (
-            <button
-              className={clsx(styles.tabArrow, styles.tabArrowRight)}
-              onClick={handleRightClick}
-            />
-          )}
-        </div>
-      </div>
-      <hr />
-      {lazy ? (
-        cloneElement(
-          children.filter(
-            (tabItem) => tabItem.props.value === selectedValue
-          )[0],
-          {
-            className: clsx("margin-vert--md", styles.responseSchemaContainer),
-          }
-        )
-      ) : (
-        <div
-          className={clsx("margin-vert--md", styles.responseSchemaContainer)}
         >
-          {children.map((tabItem, i) =>
-            cloneElement(tabItem, {
-              key: i,
-              hidden: tabItem.props.value !== selectedValue,
-            })
-          )}
-        </div>
+          {tabValues.map(({ value, label, attributes }) => (
+            <li
+              // TODO extract TabListItem
+              role="tab"
+              tabIndex={selectedValue === value ? 0 : -1}
+              aria-selected={selectedValue === value}
+              key={value}
+              ref={(tabControl) => tabRefs.push(tabControl)}
+              onKeyDown={handleKeydown}
+              onClick={handleTabChange}
+              {...attributes}
+              className={clsx(
+                "tabs__item",
+                "openapi-tabs__response-code-item",
+                attributes?.className,
+                parseInt(value) >= 400
+                  ? "danger"
+                  : parseInt(value) >= 200 && parseInt(value) < 300
+                  ? "success"
+                  : "info",
+                {
+                  active: selectedValue === value,
+                }
+              )}
+            >
+              {label ?? value}
+            </li>
+          ))}
+        </ul>
+        {showTabArrows && (
+          <button
+            className="openapi-tabs__arrow right"
+            onClick={handleRightClick}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+function TabContent({ lazy, children, selectedValue }) {
+  // eslint-disable-next-line no-param-reassign
+  children = Array.isArray(children) ? children : [children];
+  if (lazy) {
+    const selectedTabItem = children.find(
+      (tabItem) => tabItem.props.value === selectedValue
+    );
+    if (!selectedTabItem) {
+      // fail-safe or fail-fast? not sure what's best here
+      return null;
+    }
+    return cloneElement(selectedTabItem, { className: "margin-top--md" });
+  }
+  return (
+    <div className="margin-top--md">
+      {children.map((tabItem, i) =>
+        cloneElement(tabItem, {
+          key: i,
+          hidden: tabItem.props.value !== selectedValue,
+        })
       )}
     </div>
   );
 }
-
+function TabsComponent(props) {
+  const tabs = useTabs(props);
+  return (
+    <div className="openapi-tabs__container">
+      <TabList {...props} {...tabs} />
+      <TabContent {...props} {...tabs} />
+    </div>
+  );
+}
 export default function ApiTabs(props) {
   const isBrowser = useIsBrowser();
   return (
-    <ApiTabsComponent // Remount tabs after hydration
+    <TabsComponent
+      // Remount tabs after hydration
       // Temporary fix for https://github.com/facebook/docusaurus/issues/5653
       key={String(isBrowser)}
       {...props}

@@ -18,6 +18,10 @@
     "canary:version": "echo 0.0.0-`git rev-list --count HEAD`+`git rev-parse --short HEAD`",
     "canary:bumpVersion": "yarn lerna version `yarn --silent canary:version` --exact --no-push --yes",
     "canary:publish": "yarn lerna publish from-package --dist-tag canary --yes --no-verify-access",
+    "canaryBeta": "yarn canaryBeta:bumpVersion && yarn canaryBeta:publish",
+    "canaryBeta:version": "echo 0.0.0-beta.`git rev-list --count HEAD`+`git rev-parse --short HEAD`",
+    "canaryBeta:bumpVersion": "yarn lerna version `yarn --silent canaryBeta:version` --exact --no-push --yes",
+    "canaryBeta:publish": "yarn lerna publish from-package --dist-tag canary --yes --no-verify-access",
     "serve": "yarn workspace demo serve",
     "start": "yarn workspace demo start",
     "gen-api": "yarn workspace demo gen-api-docs all",
@@ -30,25 +34,20 @@
     "test:cypress:dev": "start-server-and-test watch:demo http://localhost:3000 cy:open",
     "test:cypress": "start-server-and-test serve http://localhost:3000 cy:run",
     "release:changelog": "scripts/changelog.ts",
+    "release:changelogBeta": "scripts/changelog-beta.ts",
     "release:version": "scripts/version.ts",
     "release:publish": "scripts/publish.ts",
-    "clean": "rm -rf node_modules build demo/.docusaurus demo/build demo/node_modules && find packages -name node_modules -type d -maxdepth 2 -exec rm -rf {} + && find packages -name dist -type d -maxdepth 2 -exec rm -rf {} + && find packages -name lib -type d -maxdepth 2 -exec rm -rf {} + && find packages -name lib-next -type d -maxdepth 2 -exec rm -rf {} +"
+    "clean": "yarn workspace demo clean-all && rm -rf node_modules build demo/.docusaurus demo/build demo/node_modules && find packages -name node_modules -type d -maxdepth 2 -exec rm -rf {} + && find packages -name dist -type d -maxdepth 2 -exec rm -rf {} + && find packages -name lib -type d -maxdepth 2 -exec rm -rf {} + && find packages -name lib-next -type d -maxdepth 2 -exec rm -rf {} +"
   },
   "devDependencies": {
-    "@babel/cli": "^7.16.0",
     "@babel/core": "^7.16.0",
-    "@babel/eslint-parser": "^7.16.3",
-    "@babel/plugin-proposal-nullish-coalescing-operator": "^7.16.0",
-    "@babel/plugin-proposal-optional-chaining": "^7.16.0",
-    "@babel/plugin-transform-modules-commonjs": "^7.16.0",
-    "@babel/preset-typescript": "^7.16.0",
+    "@eslint-community/eslint-utils": "^4.4.0",
     "@testing-library/cypress": "^8.0.1",
     "@types/jest": "^27.0.2",
     "@types/node": "^17.0.2",
     "@typescript-eslint/eslint-plugin": "^4.0.0",
     "@typescript-eslint/parser": "^4.0.0",
     "babel-eslint": "^10.0.0",
-    "cross-env": "^7.0.3",
     "cypress": "^8.7.0",
     "eslint": "^7.5.0",
     "eslint-config-react-app": "^6.0.0",
@@ -72,7 +71,7 @@
     "start-server-and-test": "^1.14.0",
     "ts-jest": "^27.0.6",
     "ts-node": "^10.4.0",
-    "typescript": "5.2.2"
+    "typescript": "^4.4.4"
   },
   "lint-staged": {
     "**/*": "prettier --write --ignore-unknown"
@@ -83,5 +82,6 @@
   "dependencies": {
     "@slashid/slashid": "^1.6.1",
     "yalc": "^1.0.0-pre.53"
-  }
+  },
+  "packageManager": "yarn@1.22.1"
 }
