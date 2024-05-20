@@ -1,13 +1,11 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const lightCodeTheme = require("prism-react-renderer/themes/github");
-const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 const { DOCUSAURUS_VERSION } = require("@docusaurus/utils");
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: "Docusaurus OpenAPI",
+  title: "Docusaurus OpenAPI Docs",
   tagline: "OpenAPI plugin for generating API reference docs in Docusaurus v2",
   url: "https://docusaurus-openapi.tryingpan.dev",
   baseUrl: "/",
@@ -138,9 +136,7 @@ const config = {
         copyright: `Copyright © ${new Date().getFullYear()} Palo Alto Networks, Inc. Built with Docusaurus ${DOCUSAURUS_VERSION}.`,
       },
       prism: {
-        theme: lightCodeTheme,
-        darkTheme: darkCodeTheme,
-        additionalLanguages: ["ruby", "csharp", "php"],
+        additionalLanguages: ["ruby", "csharp", "php", "java", "powershell"],
       },
       languageTabs: [
         {
@@ -152,6 +148,7 @@ const config = {
           highlight: "python",
           language: "python",
           logoClass: "python",
+          variant: "requests",
         },
         {
           highlight: "go",
@@ -162,23 +159,46 @@ const config = {
           highlight: "javascript",
           language: "nodejs",
           logoClass: "nodejs",
+          variant: "axios",
         },
-        // {
-        //   highlight: "ruby",
-        //   language: "ruby",
-        //   logoClass: "ruby",
-        // },
+        {
+          highlight: "ruby",
+          language: "ruby",
+          logoClass: "ruby",
+        },
         {
           highlight: "csharp",
           language: "csharp",
           logoClass: "csharp",
+          variant: "httpclient",
         },
-        // {
-        //   highlight: "php",
-        //   language: "php",
-        //   logoClass: "php",
-        // },
+        {
+          highlight: "php",
+          language: "php",
+          logoClass: "php",
+        },
+        {
+          highlight: "java",
+          language: "java",
+          logoClass: "java",
+          variant: "unirest",
+        },
+        {
+          highlight: "powershell",
+          language: "powershell",
+          logoClass: "powershell",
+        },
       ],
+      algolia: {
+        apiKey: "441074cace987cbf4640c039ebed303c",
+        appId: "J0EABTYI1A",
+        indexName: "docusaurus-openapi",
+      },
+      announcementBar: {
+        id: "announcementBar_1",
+        content:
+          "🥳 First v2.0.0 stable release! Currently only compatible with Docusaurus v2.4.1 -> v2.4.3",
+      },
     }),
 
   plugins: [
@@ -209,12 +229,18 @@ const config = {
           },
           petstore: {
             specPath: "examples/petstore.yaml",
+            proxy: "https://cors.pan.dev",
             outputDir: "docs/petstore",
             sidebarOptions: {
               groupPathsBy: "tag",
               categoryLinkSource: "tag",
             },
             template: "api.mustache", // Customize API MDX with mustache template
+            downloadUrl:
+              "https://raw.githubusercontent.com/PaloAltoNetworks/docusaurus-openapi-docs/main/demo/examples/petstore.yaml",
+            hideSendButton: false,
+            showSchemas: true,
+            disableCompression: true,
           },
           cos: {
             specPath: "examples/openapi-cos.json",
@@ -231,39 +257,17 @@ const config = {
             specPath: "examples/food/yogurtstore/openapi.yaml",
             outputDir: "docs/food/yogurtstore",
           },
+          restaurant: {
+            specPath: "examples/food/restaurant/openapi.yaml",
+            outputDir: "docs/restaurant",
+            sidebarOptions: {
+              groupPathsBy: "tagGroup",
+            },
+          },
         },
       },
     ],
-    [
-      "@docusaurus/plugin-pwa",
-      {
-        debug: true,
-        offlineModeActivationStrategies: [
-          "appInstalled",
-          "standalone",
-          "queryString",
-        ],
-        pwaHead: [
-          {
-            tagName: "link",
-            rel: "icon",
-            href: "/img/docusaurus-openapi-docs-logo.svg",
-          },
-          {
-            tagName: "link",
-            rel: "manifest",
-            href: "/manifest.json", // your PWA manifest
-          },
-          {
-            tagName: "meta",
-            name: "theme-color",
-            content: "rgb(37, 194, 160)",
-          },
-        ],
-      },
-    ],
   ],
-
   themes: ["docusaurus-theme-openapi-docs"],
   stylesheets: [
     {
@@ -273,4 +277,14 @@ const config = {
   ],
 };
 
-module.exports = config;
+async function createConfig() {
+  const lightTheme = (await import("./src/utils/prismLight.mjs")).default;
+  const darkTheme = (await import("./src/utils/prismDark.mjs")).default;
+  // @ts-expect-error: we know it exists, right
+  config.themeConfig.prism.theme = lightTheme;
+  // @ts-expect-error: we know it exists, right
+  config.themeConfig.prism.darkTheme = darkTheme;
+  return config;
+}
+
+module.exports = createConfig;

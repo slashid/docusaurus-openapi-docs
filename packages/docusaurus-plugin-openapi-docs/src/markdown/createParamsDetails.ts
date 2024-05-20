@@ -5,10 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  * ========================================================================== */
 
-import { ApiItem } from "../types";
 import { createDetails } from "./createDetails";
 import { createDetailsSummary } from "./createDetailsSummary";
 import { create } from "./utils";
+import { ApiItem } from "../types";
 
 interface Props {
   parameters: ApiItem["parameters"];
@@ -25,13 +25,15 @@ export function createParamsDetails({ parameters, type }: Props) {
   }
 
   return createDetails({
+    className: "openapi-markdown__details",
     "data-collapsed": false,
     open: true,
     style: { marginBottom: "1rem" },
     children: [
       createDetailsSummary({
         children: [
-          create("strong", {
+          create("h3", {
+            className: "openapi-markdown__details-summary-header-params",
             children: `${
               type.charAt(0).toUpperCase() + type.slice(1)
             } Parameters`,

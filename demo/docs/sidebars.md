@@ -51,12 +51,18 @@ For greater control, you also have the option of constructing the sidebar object
 
 The OpenAPI docs plugin provides out-of-the-box support for grouping paths by "tag". What this means is that the plugin will automatically generate a sidebar slice using the first path tag as the "group by" value and the path itself as one of the `items` under that category.
 
+### Grouping by TagGroup
+
+The OpenAPI docs plugin provides out-of-the-box support for grouping paths by "tagGroup".
+What this means is that the plugin will automatically generate a sidebar slice using the first path group as the "group by" value and the path itself as one of the `tags` under that category.
+Use `x-tagGroups` to group tags in the [Reference](https://redocly.com/docs/api-reference-docs/specification-extensions/x-tag-groups/) docs navigation sidebar. Add it to the root OpenAPI object.
+
 ### Category Links
 
 Docusaurus now supports the ability to designate or customize what page gets displayed when a category is clicked.
 
 The OpenAPI Docs plugin can leverage this feature in a number of ways, including:
 
-- Using the `generated-index` feature to create an index of all paths/endpoints availabke under a tag.
+- Using the `generated-index` feature to create an index of all paths/endpoints available under a tag.
 - Setting the `tag` description of an OpenAPI specification as the content that displays when a category is clicked.
 - Setting the `info` section of an OpenAPI specification as the page that displays when a category is clicked (reserved primarily for micro-specs).

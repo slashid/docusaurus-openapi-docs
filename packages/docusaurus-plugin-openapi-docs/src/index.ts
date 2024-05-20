@@ -7,17 +7,32 @@
 
 import fs from "fs";
 import path from "path";
+import zlib from "zlib";
 
 import type { LoadContext, Plugin } from "@docusaurus/types";
-import { Globby } from "@docusaurus/utils";
+import { Globby, posixPath } from "@docusaurus/utils";
 import chalk from "chalk";
 import { render } from "mustache";
 
-import { createApiPageMD, createInfoPageMD, createTagPageMD } from "./markdown";
+import {
+  createApiPageMD,
+  createInfoPageMD,
+  createSchemaPageMD,
+  createTagPageMD,
+} from "./markdown";
 import { readOpenapiFiles, processOpenapiFiles } from "./openapi";
 import { OptionsSchema } from "./options";
 import generateSidebarSlice from "./sidebars";
-import type { PluginOptions, LoadedContent, APIOptions } from "./types";
+import type {
+  PluginOptions,
+  LoadedContent,
+  APIOptions,
+  ApiMetadata,
+  ApiPageMetadata,
+  InfoPageMetadata,
+  TagPageMetadata,
+  SchemaPageMetadata,
+} from "./types";
 
 export function isURL(str: string): boolean {
   return /^(https?:)\/\//m.test(str);
@@ -25,30 +40,35 @@ export function isURL(str: string): boolean {
 
 export function getDocsPluginConfig(
   presetsPlugins: any[],
+  plugin: string,
   pluginId: string
 ): Object | undefined {
   // eslint-disable-next-line array-callback-return
   const filteredConfig = presetsPlugins.filter((data) => {
-    if (data[0] === pluginId) {
-      return data[1];
-    }
-
-    // Search plugin-content-docs instances
-    if (data[0] === "@docusaurus/plugin-content-docs") {
-      const configPluginId = data[1].id ? data[1].id : "default";
-      if (configPluginId === pluginId) {
+    // Search presets
+    if (Array.isArray(data)) {
+      if (typeof data[0] === "string" && data[0].endsWith(pluginId)) {
         return data[1];
+      }
+
+      // Search plugin-content-docs instances
+      if (typeof data[0] === "string" && data[0] === plugin) {
+        const configPluginId = data[1].id ? data[1].id : "default";
+        if (configPluginId === pluginId) {
+          return data[1];
+        }
       }
     }
   })[0];
+
   if (filteredConfig) {
     // Search presets, e.g. "classic"
-    if (filteredConfig[0] === pluginId) {
+    if (filteredConfig[0].endsWith(pluginId)) {
       return filteredConfig[1].docs;
     }
 
     // Search plugin-content-docs instances
-    if (filteredConfig[0] === "@docusaurus/plugin-content-docs") {
+    if (filteredConfig[0] === plugin) {
       const configPluginId = filteredConfig[1].id
         ? filteredConfig[1].id
         : "default";
@@ -72,23 +92,42 @@ export default function pluginOpenAPIDocs(
   context: LoadContext,
   options: PluginOptions
 ): Plugin<LoadedContent> {
-  const { config, docsPluginId } = options;
+  const {
+    config,
+    docsPlugin = "@docusaurus/plugin-content-docs",
+    docsPluginId,
+  } = options;
   const { siteDir, siteConfig } = context;
 
   // Get routeBasePath and path from plugin-content-docs or preset
   const presets: any = siteConfig.presets;
   const plugins: any = siteConfig.plugins;
   const presetsPlugins = presets.concat(plugins);
-  let docData: any = getDocsPluginConfig(presetsPlugins, docsPluginId);
+  let docData: any = getDocsPluginConfig(
+    presetsPlugins,
+    docsPlugin,
+    docsPluginId
+  );
   let docRouteBasePath = docData ? docData.routeBasePath : undefined;
   let docPath = docData ? (docData.path ? docData.path : "docs") : undefined;
 
   async function generateApiDocs(options: APIOptions, pluginId: any) {
-    let { specPath, outputDir, template, sidebarOptions } = options;
+    let {
+      specPath,
+      outputDir,
+      template,
+      markdownGenerators,
+      downloadUrl,
+      sidebarOptions,
+      disableCompression,
+    } = options;
+
+    // Remove trailing slash before proceeding
+    outputDir = outputDir.replace(/\/$/, "");
 
     // Override docPath if pluginId provided
     if (pluginId) {
-      docData = getDocsPluginConfig(presetsPlugins, pluginId);
+      docData = getDocsPluginConfig(presetsPlugins, docsPlugin, pluginId);
       docRouteBasePath = docData ? docData.routeBasePath : undefined;
       docPath = docData ? (docData.path ? docData.path : "docs") : undefined;
     }
@@ -98,9 +137,10 @@ export default function pluginOpenAPIDocs(
       : path.resolve(siteDir, specPath);
 
     try {
-      const openapiFiles = await readOpenapiFiles(contentPath, options);
-      const [loadedApi, tags] = await processOpenapiFiles(
+      const openapiFiles = await readOpenapiFiles(contentPath);
+      const [loadedApi, tags, tagGroups] = await processOpenapiFiles(
         openapiFiles,
+        options,
         sidebarOptions!
       );
       if (!fs.existsSync(outputDir)) {
@@ -122,7 +162,8 @@ export default function pluginOpenAPIDocs(
           options,
           loadedApi,
           tags,
-          docPath
+          docPath,
+          tagGroups
         );
 
         const sidebarSliceTemplate = `module.exports = {{{slice}}};`;
@@ -151,12 +192,12 @@ export default function pluginOpenAPIDocs(
         : `---
 id: {{{id}}}
 title: "{{{title}}}"
-description: "{{{description}}}"
+description: "{{{frontMatter.description}}}"
 {{^api}}
 sidebar_label: Introduction
 {{/api}}
 {{#api}}
-sidebar_label: {{{title}}}
+sidebar_label: "{{{title}}}"
 {{/api}}
 {{^api}}
 sidebar_position: 0
@@ -174,6 +215,16 @@ sidebar_class_name: "{{{api.method}}} api-method"
 {{#infoPath}}
 info_path: {{{infoPath}}}
 {{/infoPath}}
+custom_edit_url: null
+{{#frontMatter.proxy}}
+proxy: {{{frontMatter.proxy}}}
+{{/frontMatter.proxy}}
+{{#frontMatter.hide_send_button}}
+hide_send_button: true
+{{/frontMatter.hide_send_button}}
+{{#frontMatter.show_extensions}}
+show_extensions: true
+{{/frontMatter.show_extensions}}
 ---
 
 {{{markdown}}}
@@ -182,8 +233,8 @@ info_path: {{{infoPath}}}
       const infoMdTemplate = `---
 id: {{{id}}}
 title: "{{{title}}}"
-description: "{{{description}}}"
-sidebar_label: {{{title}}}
+description: "{{{frontMatter.description}}}"
+sidebar_label: "{{{title}}}"
 hide_title: true
 custom_edit_url: null
 ---
@@ -200,8 +251,8 @@ import {useCurrentSidebarCategory} from '@docusaurus/theme-common';
 
       const tagMdTemplate = `---
 id: {{{id}}}
-title: "{{{description}}}"
-description: "{{{description}}}"
+title: "{{{frontMatter.description}}}"
+description: "{{{frontMatter.description}}}"
 custom_edit_url: null
 ---
 
@@ -215,16 +266,65 @@ import {useCurrentSidebarCategory} from '@docusaurus/theme-common';
 \`\`\`
       `;
 
+      const schemaMdTemplate = `---
+id: {{{id}}}
+title: "{{{title}}}"
+description: "{{{frontMatter.description}}}"
+sidebar_label: "{{{title}}}"
+hide_title: true
+schema: true
+custom_edit_url: null
+---
+
+{{{markdown}}}
+            `;
+
+      const apiPageGenerator =
+        markdownGenerators?.createApiPageMD ?? createApiPageMD;
+      const infoPageGenerator =
+        markdownGenerators?.createInfoPageMD ?? createInfoPageMD;
+      const tagPageGenerator =
+        markdownGenerators?.createTagPageMD ?? createTagPageMD;
+      const schemaPageGenerator =
+        markdownGenerators?.createSchemaPageMD ?? createSchemaPageMD;
+
+      const pageGeneratorByType: {
+        [key in ApiMetadata["type"]]: (
+          pageData: {
+            api: ApiPageMetadata;
+            info: InfoPageMetadata;
+            tag: TagPageMetadata;
+            schema: SchemaPageMetadata;
+          }[key]
+        ) => string;
+      } = {
+        api: apiPageGenerator,
+        info: infoPageGenerator,
+        tag: tagPageGenerator,
+        schema: schemaPageGenerator,
+      };
+
       loadedApi.map(async (item) => {
-        const markdown =
-          item.type === "api"
-            ? createApiPageMD(item)
-            : item.type === "info"
-            ? createInfoPageMD(item)
-            : createTagPageMD(item);
+        if (item.type === "info") {
+          if (downloadUrl && isURL(downloadUrl)) {
+            item.downloadUrl = downloadUrl;
+          }
+        }
+        const markdown = pageGeneratorByType[item.type](item as any);
         item.markdown = markdown;
         if (item.type === "api") {
-          item.json = JSON.stringify(item.api);
+          // opportunity to compress JSON
+          // const serialize = (o: any) => {
+          //   return zlib.deflateSync(JSON.stringify(o)).toString("base64");
+          // };
+          // const deserialize = (s: any) => {
+          //   return zlib.inflateSync(Buffer.from(s, "base64")).toString();
+          // };
+          disableCompression === true
+            ? (item.json = JSON.stringify(item.api))
+            : (item.json = zlib
+                .deflateSync(JSON.stringify(item.api))
+                .toString("base64"));
           let infoBasePath = `${outputDir}/${item.infoId}`;
           if (docRouteBasePath) {
             infoBasePath = `${docRouteBasePath}/${outputDir
@@ -313,6 +413,49 @@ import {useCurrentSidebarCategory} from '@docusaurus/theme-common';
             }
           }
         }
+
+        if (item.type === "schema") {
+          if (!fs.existsSync(`${outputDir}/schemas/${item.id}.schema.mdx`)) {
+            if (!fs.existsSync(`${outputDir}/schemas`)) {
+              try {
+                fs.mkdirSync(`${outputDir}/schemas`, { recursive: true });
+                console.log(
+                  chalk.green(`Successfully created "${outputDir}/schemas"`)
+                );
+              } catch (err) {
+                console.error(
+                  chalk.red(`Failed to create "${outputDir}/schemas"`),
+                  chalk.yellow(err)
+                );
+              }
+            }
+            try {
+              // kebabCase(arg) returns 0-length string when arg is undefined
+              if (item.id.length === 0) {
+                throw Error("Schema must have title defined");
+              }
+              // eslint-disable-next-line testing-library/render-result-naming-convention
+              const schemaView = render(schemaMdTemplate, item);
+              fs.writeFileSync(
+                `${outputDir}/schemas/${item.id}.schema.mdx`,
+                schemaView,
+                "utf8"
+              );
+              console.log(
+                chalk.green(
+                  `Successfully created "${outputDir}/${item.id}.schema.mdx"`
+                )
+              );
+            } catch (err) {
+              console.error(
+                chalk.red(
+                  `Failed to write "${outputDir}/${item.id}.schema.mdx"`
+                ),
+                chalk.yellow(err)
+              );
+            }
+          }
+        }
         return;
       });
 
@@ -325,9 +468,13 @@ import {useCurrentSidebarCategory} from '@docusaurus/theme-common';
 
   async function cleanApiDocs(options: APIOptions) {
     const { outputDir } = options;
-    const apiDir = path.join(siteDir, outputDir);
+    const apiDir = posixPath(path.join(siteDir, outputDir));
     const apiMdxFiles = await Globby(["*.api.mdx", "*.info.mdx", "*.tag.mdx"], {
       cwd: path.resolve(apiDir),
+      deep: 1,
+    });
+    const schemaMdxFiles = await Globby(["*.schema.mdx"], {
+      cwd: path.resolve(apiDir, "schemas"),
       deep: 1,
     });
     const sidebarFile = await Globby(["sidebar.js"], {
@@ -343,6 +490,21 @@ import {useCurrentSidebarCategory} from '@docusaurus/theme-common';
           );
         } else {
           console.log(chalk.green(`Cleanup succeeded for "${apiDir}/${mdx}"`));
+        }
+      })
+    );
+
+    schemaMdxFiles.map((mdx) =>
+      fs.unlink(`${apiDir}/schemas/${mdx}`, (err) => {
+        if (err) {
+          console.error(
+            chalk.red(`Cleanup failed for "${apiDir}/schemas/${mdx}"`),
+            chalk.yellow(err)
+          );
+        } else {
+          console.log(
+            chalk.green(`Cleanup succeeded for "${apiDir}/schemas/${mdx}"`)
+          );
         }
       })
     );

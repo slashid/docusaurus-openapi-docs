@@ -8,27 +8,49 @@
 import React from "react";
 
 import CodeBlock from "@theme/CodeBlock";
+import SchemaTabs from "@theme/SchemaTabs";
+import TabItem from "@theme/TabItem";
+/* eslint-disable import/no-extraneous-dependencies*/
+import clsx from "clsx";
+import { createDescription } from "docusaurus-theme-openapi-docs/lib/markdown/createDescription";
+/* eslint-disable import/no-extraneous-dependencies*/
+import {
+  getQualifierMessage,
+  getSchemaName,
+} from "docusaurus-theme-openapi-docs/lib/markdown/schema";
+/* eslint-disable import/no-extraneous-dependencies*/
+import {
+  guard,
+  toString,
+} from "docusaurus-theme-openapi-docs/lib/markdown/utils";
 import ReactMarkdown from "react-markdown";
-
-import { createDescription } from "../../markdown/createDescription";
-import { getQualifierMessage, getSchemaName } from "../../markdown/schema";
-import { guard } from "../../markdown/utils";
-import styles from "./styles.module.css";
+import rehypeRaw from "rehype-raw";
 
 function ParamsItem({
-  param: { description, example, examples, name, required, schema },
+  param: { description, example, examples, name, required, schema, deprecated },
 }) {
+  if (!schema || !schema?.type) {
+    schema = { type: "any" };
+  }
+
   const renderSchemaName = guard(schema, (schema) => (
-    <span className={styles.schemaName}> {getSchemaName(schema)}</span>
+    <span className="openapi-schema__type"> {getSchemaName(schema)}</span>
   ));
 
   const renderSchemaRequired = guard(required, () => (
-    <strong className={styles.paramsRequired}> required</strong>
+    <span className="openapi-schema__required">required</span>
+  ));
+
+  const renderDeprecated = guard(deprecated, () => (
+    <span className="openapi-schema__deprecated">deprecated</span>
   ));
 
   const renderSchema = guard(getQualifierMessage(schema), (message) => (
     <div>
-      <ReactMarkdown children={createDescription(message)} />
+      <ReactMarkdown
+        children={createDescription(message)}
+        rehypePlugins={[rehypeRaw]}
+      />
     </div>
   ));
 
@@ -48,6 +70,7 @@ function ParamsItem({
             );
           },
         }}
+        rehypePlugins={[rehypeRaw]}
       />
     </div>
   ));
@@ -65,32 +88,62 @@ function ParamsItem({
     )
   );
 
-  const renderExample = guard(example, (example) => (
-    <div>{`Example: ${example}`}</div>
+  const renderExample = guard(toString(example), (example) => (
+    <div>
+      <strong>Example: </strong>
+      {example}
+    </div>
   ));
 
   const renderExamples = guard(examples, (examples) => {
     const exampleEntries = Object.entries(examples);
     return (
       <>
-        {exampleEntries.map(([k, v]) => (
-          <div>{`Example (${k}): ${v.value}`}</div>
-        ))}
+        <strong>Examples:</strong>
+        <SchemaTabs>
+          {exampleEntries.map(([exampleName, exampleProperties]) => (
+            <TabItem value={exampleName} label={exampleName}>
+              {exampleProperties.summary && <p>{exampleProperties.summary}</p>}
+              {exampleProperties.description && (
+                <p>
+                  <strong>Description: </strong>
+                  <span>{exampleProperties.description}</span>
+                </p>
+              )}
+              <p>
+                <strong>Example: </strong>
+                <code>{exampleProperties.value}</code>
+              </p>
+            </TabItem>
+          ))}
+        </SchemaTabs>
       </>
     );
   });
 
   return (
-    <li className={styles.paramsItem}>
-      <strong>{name}</strong>
-      {renderSchemaName}
-      {renderSchemaRequired}
+    <div className="openapi-params__list-item">
+      <span className="openapi-schema__container">
+        <strong
+          className={clsx("openapi-schema__property", {
+            "openapi-schema__strikethrough": deprecated,
+          })}
+        >
+          {name}
+        </strong>
+        {renderSchemaName}
+        {(required || deprecated) && (
+          <span className="openapi-schema__divider"></span>
+        )}
+        {renderSchemaRequired}
+        {renderDeprecated}
+      </span>
       {renderSchema}
       {renderDefaultValue}
       {renderDescription}
       {renderExample}
       {renderExamples}
-    </li>
+    </div>
   );
 }
 

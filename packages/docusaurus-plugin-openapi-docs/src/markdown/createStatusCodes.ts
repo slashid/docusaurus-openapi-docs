@@ -7,14 +7,14 @@
 
 import format from "xml-formatter";
 
-import { sampleResponseFromSchema } from "../openapi/createResponseExample";
-import { ApiItem } from "../types";
 import { createDescription } from "./createDescription";
 import { createDetails } from "./createDetails";
 import { createDetailsSummary } from "./createDetailsSummary";
 import { createResponseSchema } from "./createResponseSchema";
 import { create } from "./utils";
 import { guard } from "./utils";
+import { sampleResponseFromSchema } from "../openapi/createResponseExample";
+import { ApiItem } from "../types";
 
 export default function json2xml(o: any, tab: any) {
   var toXml = function (v: any, name: string, ind: any) {
@@ -54,6 +54,8 @@ export default function json2xml(o: any, tab: any) {
 }
 
 interface Props {
+  id?: string;
+  label?: string;
   responses: ApiItem["responses"];
 }
 
@@ -62,46 +64,45 @@ function createResponseHeaders(responseHeaders: any) {
     create("ul", {
       style: { marginLeft: "1rem" },
       children: [
-        Object.entries(responseHeaders).map(([headerName, headerObj]) => {
-          const {
-            description,
-            schema: { type },
-            example,
-          }: any = headerObj;
+        Object.entries(responseHeaders).map(
+          ([headerName, headerObj]: [any, any]) => {
+            const { description, example }: any = headerObj;
+            const type = headerObj.schema?.type ?? "any";
 
-          return create("li", {
-            className: "schemaItem",
-            children: [
-              createDetailsSummary({
-                children: [
-                  create("strong", { children: headerName }),
-                  guard(type, () => [
-                    create("span", {
-                      style: { opacity: "0.6" },
-                      children: ` ${type}`,
-                    }),
-                  ]),
-                ],
-              }),
-              create("div", {
-                children: [
-                  guard(description, (description) =>
-                    create("div", {
-                      style: {
-                        marginTop: ".5rem",
-                        marginBottom: ".5rem",
-                      },
-                      children: [
-                        guard(example, () => `Example: ${example}`),
-                        createDescription(description),
-                      ],
-                    })
-                  ),
-                ],
-              }),
-            ],
-          });
-        }),
+            return create("li", {
+              className: "schemaItem",
+              children: [
+                createDetailsSummary({
+                  children: [
+                    create("strong", { children: headerName }),
+                    guard(type, () => [
+                      create("span", {
+                        style: { opacity: "0.6" },
+                        children: ` ${type}`,
+                      }),
+                    ]),
+                  ],
+                }),
+                create("div", {
+                  children: [
+                    guard(description, (description) =>
+                      create("div", {
+                        style: {
+                          marginTop: ".5rem",
+                          marginBottom: ".5rem",
+                        },
+                        children: [
+                          guard(example, () => `Example: ${example}`),
+                          createDescription(description),
+                        ],
+                      })
+                    ),
+                  ],
+                }),
+              ],
+            });
+          }
+        ),
       ],
     })
   );
@@ -120,15 +121,16 @@ export function createResponseExamples(
   }
   return Object.entries(responseExamples).map(
     ([exampleName, exampleValue]: any) => {
-      const camelToSpaceName = exampleName.replace(/([A-Z])/g, " $1");
-      let finalFormattedName =
-        camelToSpaceName.charAt(0).toUpperCase() + camelToSpaceName.slice(1);
-
       if (typeof exampleValue.value === "object") {
         return create("TabItem", {
-          label: `${finalFormattedName}`,
-          value: `${finalFormattedName}`,
+          label: `${exampleName}`,
+          value: `${exampleName}`,
           children: [
+            guard(exampleValue.summary, (summary) => [
+              create("Markdown", {
+                children: ` ${summary}`,
+              }),
+            ]),
             create("ResponseSamples", {
               responseExample: JSON.stringify(exampleValue.value, null, 2),
               language: language,
@@ -137,9 +139,14 @@ export function createResponseExamples(
         });
       }
       return create("TabItem", {
-        label: `${finalFormattedName}`,
-        value: `${finalFormattedName}`,
+        label: `${exampleName}`,
+        value: `${exampleName}`,
         children: [
+          guard(exampleValue.summary, (summary) => [
+            create("Markdown", {
+              children: ` ${summary}`,
+            }),
+          ]),
           create("ResponseSamples", {
             responseExample: exampleValue.value,
             language: language,
@@ -163,6 +170,11 @@ export function createResponseExample(responseExample: any, mimeType: string) {
       label: `Example`,
       value: `Example`,
       children: [
+        guard(responseExample.summary, (summary) => [
+          create("Markdown", {
+            children: ` ${summary}`,
+          }),
+        ]),
         create("ResponseSamples", {
           responseExample: JSON.stringify(responseExample, null, 2),
           language: language,
@@ -174,6 +186,11 @@ export function createResponseExample(responseExample: any, mimeType: string) {
     label: `Example`,
     value: `Example`,
     children: [
+      guard(responseExample.summary, (summary) => [
+        create("Markdown", {
+          children: ` ${summary}`,
+        }),
+      ]),
       create("ResponseSamples", {
         responseExample: responseExample,
         language: language,
@@ -239,7 +256,7 @@ export function createExampleFromSchema(schema: any, mimeType: string) {
   return undefined;
 }
 
-export function createStatusCodes({ responses }: Props) {
+export function createStatusCodes({ label, id, responses }: Props) {
   if (responses === undefined) {
     return undefined;
   }
@@ -251,45 +268,50 @@ export function createStatusCodes({ responses }: Props) {
 
   return create("div", {
     children: [
-      create("ApiTabs", {
-        // TODO: determine if we should persist status code selection
-        // groupId: "api-tabs",
-        children: codes.map((code) => {
-          const responseHeaders: any = responses[code].headers;
-          return create("TabItem", {
-            label: code,
-            value: code,
-            children: [
-              create("div", {
-                children: createDescription(responses[code].description),
-              }),
-              responseHeaders &&
-                createDetails({
-                  "data-collaposed": true,
-                  open: false,
-                  style: { textAlign: "left", marginBottom: "1rem" },
-                  children: [
-                    createDetailsSummary({
+      create("div", {
+        children: [
+          create("ApiTabs", {
+            label,
+            id,
+            children: codes.map((code) => {
+              const responseHeaders: any = responses[code].headers;
+              return create("TabItem", {
+                label: code,
+                value: code,
+                children: [
+                  create("div", {
+                    children: createDescription(responses[code].description),
+                  }),
+                  responseHeaders &&
+                    createDetails({
+                      className: "openapi-markdown__details",
+                      "data-collaposed": true,
+                      open: false,
+                      style: { textAlign: "left", marginBottom: "1rem" },
                       children: [
-                        create("strong", {
-                          children: "Response Headers",
+                        createDetailsSummary({
+                          children: [
+                            create("strong", {
+                              children: "Response Headers",
+                            }),
+                          ],
                         }),
+                        createResponseHeaders(responseHeaders),
                       ],
                     }),
-                    createResponseHeaders(responseHeaders),
-                  ],
-                }),
-              create("div", {
-                children: createResponseSchema({
-                  title: "Schema",
-                  body: {
-                    content: responses[code].content,
-                  },
-                }),
-              }),
-            ],
-          });
-        }),
+                  create("div", {
+                    children: createResponseSchema({
+                      title: "Schema",
+                      body: {
+                        content: responses[code].content,
+                      },
+                    }),
+                  }),
+                ],
+              });
+            }),
+          }),
+        ],
       }),
     ],
   });

@@ -10,6 +10,7 @@ import type Request from "@paloaltonetworks/postman-collection";
 import {
   InfoObject,
   OperationObject,
+  SchemaObject,
   SecuritySchemeObject,
   TagObject,
 } from "./openapi/types";
@@ -22,6 +23,7 @@ export type {
 } from "@docusaurus/plugin-content-docs-types";
 export interface PluginOptions {
   id?: string;
+  docsPlugin?: string;
   docsPluginId: string;
   config: {
     [key: string]: APIOptions;
@@ -32,6 +34,9 @@ export interface APIOptions {
   specPath: string;
   outputDir: string;
   template?: string;
+  downloadUrl?: string;
+  hideSendButton?: boolean;
+  showExtensions?: boolean;
   sidebarOptions?: SidebarOptions;
   version?: string;
   label?: string;
@@ -39,11 +44,22 @@ export interface APIOptions {
   versions?: {
     [key: string]: APIVersionOptions;
   };
+  proxy?: string;
+  markdownGenerators?: MarkdownGenerator;
+  showSchemas?: boolean;
+  disableCompression?: boolean;
+}
+
+export interface MarkdownGenerator {
+  createApiPageMD?: (pageData: ApiPageMetadata) => string;
+  createInfoPageMD?: (pageData: InfoPageMetadata) => string;
+  createTagPageMD?: (pageData: TagPageMetadata) => string;
+  createSchemaPageMD?: (pageData: SchemaPageMetadata) => string;
 }
 
 export interface SidebarOptions {
   groupPathsBy?: string;
-  categoryLinkSource?: string;
+  categoryLinkSource?: "info" | "tag" | "auto";
   customProps?: { [key: string]: unknown };
   sidebarCollapsible?: boolean;
   sidebarCollapsed?: boolean;
@@ -61,7 +77,11 @@ export interface LoadedContent {
   // loadedDocs: DocPageMetadata[]; TODO: cleanup
 }
 
-export type ApiMetadata = ApiPageMetadata | InfoPageMetadata | TagPageMetadata;
+export type ApiMetadata =
+  | ApiPageMetadata
+  | InfoPageMetadata
+  | TagPageMetadata
+  | SchemaPageMetadata;
 
 export interface ApiMetadataBase {
   sidebar?: string;
@@ -72,6 +92,7 @@ export interface ApiMetadataBase {
   unversionedId: string; // TODO new unversioned id => try to rename to "id"
   infoId?: string;
   infoPath?: string;
+  downloadUrl?: string;
   title: string;
   description: string;
   source: string; // @site aliased source => "@site/docs/folder/subFolder/subSubFolder/myDoc.md"
@@ -80,6 +101,8 @@ export interface ApiMetadataBase {
   permalink: string;
   sidebarPosition?: number;
   frontMatter: Record<string, unknown>;
+  method?: string;
+  path?: string;
 }
 
 export interface ApiPageMetadata extends ApiMetadataBase {
@@ -97,8 +120,10 @@ export interface ApiItem extends OperationObject {
     [key: string]: SecuritySchemeObject;
   };
   postman?: Request;
+  proxy?: string;
   info: InfoObject;
   userAttrs?: any;
+  extensions?: object;
 }
 
 export interface InfoPageMetadata extends ApiMetadataBase {
@@ -113,6 +138,19 @@ export interface InfoPageMetadata extends ApiMetadataBase {
 export interface TagPageMetadata extends ApiMetadataBase {
   type: "tag";
   tag: TagObject;
+  markdown?: string;
+}
+
+export interface SchemaPageMetadata extends ApiMetadataBase {
+  type: "schema";
+  schema: SchemaObject;
+  markdown?: string;
+}
+
+export interface TagGroupPageMetadata extends ApiMetadataBase {
+  type: "tagGroup";
+  name: string;
+  tags: TagObject[];
   markdown?: string;
 }
 
