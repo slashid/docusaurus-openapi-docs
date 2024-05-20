@@ -7,13 +7,6 @@
 
 import { escape } from "lodash";
 
-import {
-  ContactObject,
-  LicenseObject,
-  MediaTypeObject,
-  SecuritySchemeObject,
-} from "../openapi/types";
-import { ApiPageMetadata, InfoPageMetadata, TagPageMetadata } from "../types";
 import { createAuthentication } from "./createAuthentication";
 import { createContactInfo } from "./createContactInfo";
 import { createDeprecationNotice } from "./createDeprecationNotice";
@@ -26,6 +19,13 @@ import { createStatusCodes } from "./createStatusCodes";
 import { createTermsOfService } from "./createTermsOfService";
 import { createVersionBadge } from "./createVersionBadge";
 import { render } from "./utils";
+import {
+  ContactObject,
+  LicenseObject,
+  MediaTypeObject,
+  SecuritySchemeObject,
+} from "../openapi/types";
+import { ApiPageMetadata, InfoPageMetadata, TagPageMetadata } from "../types";
 
 interface Props {
   title: string;
@@ -60,7 +60,7 @@ export function createApiPageMD({
     `import TabItem from "@theme/TabItem";\n\n`,
     `## ${escape(title)}\n\n`,
     createDeprecationNotice({ deprecated, description: deprecatedDescription }),
-    createDescription(escape(description)),
+    createDescription(description),
     createParamsDetails({ parameters, type: "path" }),
     createParamsDetails({ parameters, type: "query" }),
     createParamsDetails({ parameters, type: "header" }),
