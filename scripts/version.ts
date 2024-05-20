@@ -71,8 +71,6 @@ function main() {
       nextVersion = v;
   }
 
-  console.log({ nextVersion });
-
   execSync(
     `npm run lerna version ${nextVersion} --no-git-tag-version --no-push --yes` /* ,
     { stdio: "ignore" } */
