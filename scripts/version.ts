@@ -72,8 +72,8 @@ function main() {
   }
 
   execSync(
-    `lerna version ${nextVersion} --no-git-tag-version --no-push --yes`,
-    { stdio: "ignore" }
+    `npm run lerna version ${nextVersion} --no-git-tag-version --no-push --yes` /* ,
+    { stdio: "ignore" } */
   );
 }
 
